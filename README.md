@@ -12,6 +12,7 @@ El proyecto evita abstracciones de alto nivel para comunicarse directamente con 
 2. **Enumeración de Procesos:** Recorre la instantánea de manera secuencial mediante las funciones de la API Wide-char (`Process32FirstW` y `Process32NextW`) para garantizar la correcta decodificación de caracteres Unicode (UTF-16).
 3. **Mapeo de Memoria a Bajo Nivel:** Replica la estructura nativa de C `PROCESSENTRY32` en Go, calculando el alineamiento exacto de bytes mediante `unsafe.Sizeof` y punteros seguros con `unsafe.Pointer`.
 4. **Gestión de Handles y Recursos:** Implementa un ciclo de vida estricto para los manejadores del sistema operativo, liberando memoria de forma segura utilizando `defer syscall.CloseHandle`.
+5. **Terminación de Procesos (Task Killer):** Solicita permisos de manipulación a nivel de kernel mediante `OpenProcess` con la bandera `PROCESS_TERMINATE` y ejecuta el cierre seguro con `TerminateProcess`.
 
 ---
 

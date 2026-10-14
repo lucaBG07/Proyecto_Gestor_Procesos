@@ -8,6 +8,7 @@ import (
 
 const (
 	TH32CS_SNAPPROCESS = 0x00000002
+	PROCESS_TERMINATE  = 0x0001 // Permiso necesario para cerrar un proceso
 )
 
 type PROCESSENTRY32 struct {
@@ -21,6 +22,35 @@ type PROCESSENTRY32 struct {
 	PcPriClassBase      int32       // Le indica al planificador de windos cuanta atencion de la CPU debe recibir este programa a diferencia de los demas
 	DwFlags             uint32      // reservado para uso interno de Windows (flags de control)
 	SzExeFile           [260]uint16 // array de 260 caracteres para guardar el nombre del .exe en UTF-16
+}
+
+func matarProceso(pid uint32) error {
+	kernel32 := syscall.MustLoadDLL("kernel32.dll")
+
+	// Esta funcion sirve para pedirle permiso a windows para manipular ese programa en especifico pasandole su PID.
+	// Si Windows lo aprueba devuelve un handle (es como un ticket de acceso).
+	openProcess := kernel32.MustFindProc("OpenProcess")
+
+	// Buscamos la funcion "TerminateProcess", la cual pasandole el handle apaga el programa.
+	terminateProcess := kernel32.MustFindProc("TerminateProcess")
+
+	// Abrimos el proceso para obtener el handle con el permiso de terminacion
+	handle, _, err := openProcess.Call(uintptr(PROCESS_TERMINATE), uintptr(0), uintptr(pid))
+
+	if handle == 0 {
+		return fmt.Errorf("Permiso denegado (Posiblemnente este protegido): %v", err)
+	}
+	// Nos aseguramos de cerrar el handle al terminar para no dejar basura en memoria
+	defer syscall.CloseHandle(syscall.Handle(handle))
+
+	// Ordenamos terminar el proceso
+	success, _, err := terminateProcess.Call(handle, uintptr(0))
+
+	if success == 0 {
+		return fmt.Errorf("no se pudo terminar el proceso: %v", err)
+	}
+
+	return nil
 }
 
 func main() {
@@ -42,7 +72,7 @@ func main() {
 		panic(fmt.Sprintf("Error al tomar la instantánea: %v", err))
 	}
 
-	// Asegurarnos de cerrar el handle de la foto al terminar (buena práctica).
+	// Asegurarnos de cerrar el handle al terminar (buena práctica).
 	defer syscall.CloseHandle(syscall.Handle(r1))
 
 	// Creamos una instancia de nuestro molde (struct).
